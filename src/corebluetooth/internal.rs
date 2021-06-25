@@ -130,6 +130,7 @@ struct CBPeripheral {
     pub characteristics: HashMap<Uuid, CBCharacteristic>,
     pub event_sender: Sender<CBPeripheralEvent>,
     pub connected_future_state: Option<CoreBluetoothReplyStateShared>,
+    connected_state_sent: bool,
     characteristic_update_count: u32,
 }
 
@@ -157,6 +158,7 @@ impl CBPeripheral {
             characteristics: HashMap::new(),
             event_sender,
             connected_future_state: None,
+            connected_state_sent: false,
             characteristic_update_count: 0,
         }
     }
@@ -202,6 +204,7 @@ impl CBPeripheral {
                 .lock()
                 .unwrap()
                 .set_reply(CoreBluetoothReply::Connected(char_set));
+            self.connected_state_sent = true;
         }
     }
 }
@@ -395,7 +398,11 @@ impl CoreBluetoothInternal {
             info!("{}", id);
         }
         if let Some(p) = self.peripherals.get_mut(&peripheral_uuid) {
-            p.set_characteristics(char_map);
+            if p.connected_state_sent {
+                error!("Characteristic discovery message after connection!");
+            } else {
+                p.set_characteristics(char_map);
+            }
         }
     }
 
