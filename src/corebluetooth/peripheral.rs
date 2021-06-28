@@ -216,7 +216,27 @@ impl ApiPeripheral for Peripheral {
 
     /// Terminates a connection to the device. This is a synchronous operation.
     fn disconnect(&self) -> Result<()> {
-        Ok(())
+        info!("Trying device disconnect!");
+        task::block_on(async {
+            let mut message_sender = self.message_sender.clone();
+            let fut = CoreBluetoothReplyFuture::default();
+            message_sender
+                .send(CoreBluetoothMessage::DisconnectDevice(
+                    self.uuid,
+                    fut.get_state_clone(),
+                ))
+                .await?;
+            match fut.await {
+                CoreBluetoothReply::Disconnected => {
+                    self.emit(CentralEvent::DeviceDisconnected(
+                        self.properties.lock().unwrap().address,
+                    ));
+                }
+                _ => panic!("Shouldn't get anything but disconnected!"),
+            }
+            info!("Device disconnected!");
+            Ok(())
+        })
     }
 
     /// Discovers all characteristics for the device. This is a synchronous operation.
